@@ -5,34 +5,34 @@ import misk.flags.memory.InMemoryDynamicFlagStore
 import misk.flags.memory.InMemoryDynamicFlagStoreModule
 import misk.inject.KAbstractModule
 import misk.moshi.MoshiModule
-import misk.testing.ActionTest
-import misk.testing.ActionTestModule
+import misk.testing.MiskTest
+import misk.testing.MiskTestModule
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.data.Offset
 import org.junit.jupiter.api.Test
 import javax.inject.Inject
 
-@ActionTest(startService = false)
+@MiskTest(startService = false)
 class FlagsTest {
     data class JsonData(val message: String)
 
-    @ActionTestModule
+    @MiskTestModule
     val testModule = object : KAbstractModule() {
         override fun configure() {
             install(MoshiModule())
             install(InMemoryDynamicFlagStoreModule())
             install(object : DynamicFlagModule() {
                 override fun configureFlags() {
-                    bindBooleanFlag("my-bool", "this is the boolean flag")
-                    bindDoubleFlag("my-double", "this is the double flag")
-                    bindStringFlag("my-string", "this is the string flag")
-                    bindIntFlag("my-int", "this is the int flag")
+                    bindFlag<Boolean>("my-bool", "this is the boolean flag")
+                    bindFlag<Double>("my-double", "this is the double flag")
+                    bindFlag<String>("my-string", "this is the string flag")
+                    bindFlag<Int>("my-int", "this is the int flag")
                     bindJsonFlag<JsonData>("my-json", "this is the json flag")
 
-                    bindBooleanFlag("my-other-bool", "this is the other boolean flag")
-                    bindDoubleFlag("my-other-double", "this is the other double flag")
-                    bindStringFlag("my-other-string", "this is the other string flag")
-                    bindIntFlag("my-other-int", "this is the other int flag")
+                    bindFlag<Boolean>("my-other-bool", "this is the other boolean flag")
+                    bindFlag<Double>("my-other-double", "this is the other double flag")
+                    bindFlag<String>("my-other-string", "this is the other string flag")
+                    bindFlag<Int>("my-other-int", "this is the other int flag")
                     bindJsonFlag<JsonData>("my-other-json", "this is the other json flag")
 
                 }
@@ -43,22 +43,22 @@ class FlagsTest {
     @Inject
     private lateinit
     @Named("my-bool")
-    var boolean: BooleanFlag
+    var boolean: Flag<Boolean>
 
     @Inject
     private lateinit
     @Named("my-string")
-    var string: StringFlag
+    var string: Flag<String>
 
     @Inject
     private lateinit
     @Named("my-int")
-    var int: IntFlag
+    var int: Flag<Int>
 
     @Inject
     private lateinit
     @Named("my-double")
-    var double: DoubleFlag
+    var double: Flag<Double>
 
     @Inject
     private lateinit
@@ -68,22 +68,22 @@ class FlagsTest {
     @Inject
     private lateinit
     @Named("my-other-bool")
-    var otherBoolean: BooleanFlag
+    var otherBoolean: Flag<Boolean>
 
     @Inject
     private lateinit
     @Named("my-other-string")
-    var otherString: StringFlag
+    var otherString: Flag<String>
 
     @Inject
     private lateinit
     @Named("my-other-int")
-    var otherInt: IntFlag
+    var otherInt: Flag<Int>
 
     @Inject
     private lateinit
     @Named("my-other-double")
-    var otherDouble: DoubleFlag
+    var otherDouble: Flag<Double>
 
     @Inject
     private lateinit

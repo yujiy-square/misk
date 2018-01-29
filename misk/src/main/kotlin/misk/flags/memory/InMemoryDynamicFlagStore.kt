@@ -4,38 +4,50 @@ import misk.flags.DynamicFlagStore
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
+import kotlin.reflect.KClass
 
 /** In memory implementation of a [DynamicFlagStore], suitable for use in testing */
 @Singleton
 class InMemoryDynamicFlagStore : DynamicFlagStore {
-    private val _booleanFlags = ConcurrentHashMap<String, InMemoryBooleanFlag>()
-    private val _stringFlags = ConcurrentHashMap<String, InMemoryStringFlag>()
-    private val _intFlags = ConcurrentHashMap<String, InMemoryIntFlag>()
-    private val _doubleFlags = ConcurrentHashMap<String, InMemoryDoubleFlag>()
+    private val _flags = ConcurrentHashMap<String, InMemoryFlag<*>>()
 
-    val booleanFlags: Map<String, InMemoryBooleanFlag> get() = _booleanFlags
-    val intFlags: Map<String, InMemoryIntFlag> get() = _intFlags
-    val stringFlags: Map<String, InMemoryStringFlag> get() = _stringFlags
-    val doubleFlags: Map<String, InMemoryDoubleFlag> get() = _doubleFlags
+    val flags: Map<String, InMemoryFlag<*>> get() = _flags
+    val booleanFlags: Map<String, InMemoryBooleanFlag> get() = flagsOfType()
+    val intFlags: Map<String, InMemoryIntFlag> get() = flagsOfType()
+    val stringFlags: Map<String, InMemoryStringFlag> get() = flagsOfType()
+    val doubleFlags: Map<String, InMemoryDoubleFlag> get() = flagsOfType()
 
-    override fun registerBooleanFlag(name: String, description: String): InMemoryBooleanFlag {
-        val newFlag = InMemoryBooleanFlag(name, description)
-        return _booleanFlags.putIfAbsent(name, newFlag) ?: newFlag
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : Any> registerFlag(
+            name: String,
+            description: String,
+            type: KClass<T>
+    ): InMemoryFlag<T> {
+        return when (type) {
+            Int::class -> registerFlag(InMemoryIntFlag(name, description)) as InMemoryFlag<T>
+            Boolean::class -> registerFlag(InMemoryBooleanFlag(name, description)) as InMemoryFlag<T>
+            Double::class -> registerFlag(InMemoryDoubleFlag(name, description)) as InMemoryFlag<T>
+            String::class -> registerFlag(InMemoryStringFlag(name, description)) as InMemoryFlag<T>
+            else -> throw UnsupportedOperationException("unsupported flag type ${type.java.name}")
+        }
     }
 
-    override fun registerStringFlag(name: String, description: String): InMemoryStringFlag {
-        val newFlag = InMemoryStringFlag(name, description)
-        return _stringFlags.putIfAbsent(name, newFlag) ?: newFlag
+    private inline fun <B, reified A : InMemoryFlag<B>> registerFlag(flag: A): A {
+        val existing = _flags.putIfAbsent(flag.name, flag)
+        if (existing != null) {
+            return existing as? A ?: throw IllegalStateException(
+                    "${flag.name} already registered as ${A::class.simpleName}"
+            )
+        }
+
+        return flag
     }
 
-    override fun registerIntFlag(name: String, description: String): InMemoryIntFlag {
-        val newFlag = InMemoryIntFlag(name, description)
-        return _intFlags.putIfAbsent(name, newFlag) ?: newFlag
-    }
+    private inline fun <reified A : InMemoryFlag<*>> flagsOfType(): Map<String, A> {
+        return flags
+                .filterValues { it is A }
+                .mapValues { (_, flag) -> flag as A }
 
-    override fun registerDoubleFlag(name: String, description: String): InMemoryDoubleFlag {
-        val newFlag = InMemoryDoubleFlag(name, description)
-        return _doubleFlags.putIfAbsent(name, newFlag) ?: newFlag
     }
 
     override fun awaitRegistrationsComplete(timeout: Long, unit: TimeUnit) {}

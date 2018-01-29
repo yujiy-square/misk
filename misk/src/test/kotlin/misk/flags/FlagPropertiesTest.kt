@@ -5,14 +5,14 @@ import misk.flags.memory.InMemoryDynamicFlagStore
 import misk.flags.memory.InMemoryDynamicFlagStoreModule
 import misk.inject.KAbstractModule
 import misk.moshi.MoshiModule
-import misk.testing.ActionTest
-import misk.testing.ActionTestModule
+import misk.testing.MiskTest
+import misk.testing.MiskTestModule
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.data.Offset
 import org.junit.jupiter.api.Test
 import javax.inject.Inject
 
-@ActionTest(startService = false)
+@MiskTest(startService = false)
 class FlagPropertiesTest {
 
     data class JsonData(val message: String)
@@ -25,7 +25,7 @@ class FlagPropertiesTest {
         val json by JsonFlag<JsonData>(description = "this is the json flag")
     }
 
-    @ActionTestModule
+    @MiskTestModule
     val testModule = object : KAbstractModule() {
         override fun configure() {
             install(MoshiModule())

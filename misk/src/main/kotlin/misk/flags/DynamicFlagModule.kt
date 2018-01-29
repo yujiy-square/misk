@@ -23,115 +23,91 @@ abstract class DynamicFlagModule : KAbstractModule() {
 
     protected abstract fun configureFlags()
 
+    inline fun <reified T : Any> bindFlag(
+            name: String,
+            description: String,
+            qualifier: Annotation = Names.named(name)
+    ) {
+        bindFlag(name, description, T::class, qualifier)
+    }
+
+    fun <T : Any> bindFlag(
+            name: String,
+            description: String,
+            type: KClass<T>,
+            qualifier: Annotation = Names.named(name)) {
+        bind(flagTypeLiteral(type))
+                .annotatedWith(qualifier)
+                .toProvider(FlagProvider(type, name, description))
+                .asEagerSingleton()
+    }
+
     inline fun <reified T : Flags> bindFlags(prefix: String = "", qualifier: Annotation? = null) =
             bindFlags(T::class, prefix, qualifier)
 
     fun <T : Flags> bindFlags(
-            kclass: KClass<T>,
+            type: KClass<T>,
             prefix: String = "",
             qualifier: Annotation? = null
     ) {
         val actualQualifier = qualifier ?: if (!prefix.isEmpty()) Names.named(prefix) else null
-        val constructor = kclass.constructors.firstOrNull {
+        val constructor = type.constructors.firstOrNull {
             it.parameters.size == 1 && it.parameters[0].type.classifier == Flags.Context::class
         } ?: throw IllegalArgumentException(
-                "$kclass has no single argument constructor taking a Flags.Context")
+                "$type has no single argument constructor taking a Flags.Context")
 
 
         if (actualQualifier == null) {
-            bind(kclass.java)
+            bind(type.java)
                     .toProvider(FlagsProvider(constructor, prefix))
                     .asEagerSingleton()
         } else {
-            bind(kclass.java)
+            bind(type.java)
                     .annotatedWith(actualQualifier)
                     .toProvider(FlagsProvider(constructor, prefix))
                     .asEagerSingleton()
         }
     }
 
-    fun bindBooleanFlag(name: String, desc: String, qualifier: Annotation = Names.named(name)) {
-        bind<BooleanFlag>()
-                .annotatedWith(qualifier)
-                .toProvider(BooleanFlagProvider(name, desc))
-                .asEagerSingleton()
-    }
-
-    fun bindStringFlag(name: String, desc: String, qualifier: Annotation = Names.named(name)) {
-        bind<StringFlag>()
-                .annotatedWith(qualifier)
-                .toProvider(StringFlagProvider(name, desc))
-                .asEagerSingleton()
-    }
-
-    fun bindIntFlag(name: String, desc: String, qualifier: Annotation = Names.named(name)) {
-        bind<IntFlag>()
-                .annotatedWith(qualifier)
-                .toProvider(IntFlagProvider(name, desc))
-                .asEagerSingleton()
-    }
-
-    fun bindDoubleFlag(name: String, desc: String, qualifier: Annotation = Names.named(name)) {
-        bind<DoubleFlag>()
-                .annotatedWith(qualifier)
-                .toProvider(DoubleFlagProvider(name, desc))
-                .asEagerSingleton()
-    }
-
     inline fun <reified T : Any> bindJsonFlag(
             name: String,
-            desc: String,
+            description: String,
             qualifier: Annotation = Names.named(name)
-    ) = bindJsonFlag(T::class, name, desc, qualifier)
+    ) = bindJsonFlag(T::class, name, description, qualifier)
 
     fun <T : Any> bindJsonFlag(
-            kclass: KClass<T>,
+            type: KClass<T>,
             name: String,
-            desc: String,
+            description: String,
             a: Annotation = Names.named(name)
     ) {
-        val flagType = parameterizedType<JsonFlag<T>>(kclass.java)
+        val flagType = parameterizedType<JsonFlag<T>>(type.java)
 
         @Suppress("UNCHECKED_CAST")
         val flagTypeLiteral = TypeLiteral.get(flagType) as TypeLiteral<JsonFlag<T>>
         bind(flagTypeLiteral)
                 .annotatedWith(a)
-                .toProvider(JsonFlagProvider(kclass, name, desc))
+                .toProvider(JsonFlagProvider(type, name, description))
                 .asEagerSingleton()
     }
 
-    private class BooleanFlagProvider(val name: String, val desc: String) : Provider<BooleanFlag> {
+    private class FlagProvider<T : Any>(
+            val type: KClass<T>,
+            val name: String,
+            val description: String
+    ) : Provider<Flag<T>> {
         @Inject
         lateinit var flagStore: DynamicFlagStore
 
-        override fun get(): BooleanFlag = flagStore.registerBooleanFlag(name, desc)
-    }
-
-    private class StringFlagProvider(val name: String, val desc: String) : Provider<StringFlag> {
-        @Inject
-        lateinit var flagStore: DynamicFlagStore
-
-        override fun get(): StringFlag = flagStore.registerStringFlag(name, desc)
-    }
-
-    private class IntFlagProvider(val name: String, val desc: String) : Provider<IntFlag> {
-        @Inject
-        lateinit var flagStore: DynamicFlagStore
-
-        override fun get(): IntFlag = flagStore.registerIntFlag(name, desc)
-    }
-
-    private class DoubleFlagProvider(val name: String, val desc: String) : Provider<DoubleFlag> {
-        @Inject
-        lateinit var flagStore: DynamicFlagStore
-
-        override fun get(): DoubleFlag = flagStore.registerDoubleFlag(name, desc)
+        override fun get(): Flag<T> {
+            return flagStore.registerFlag(name, description, type)
+        }
     }
 
     private class JsonFlagProvider<T : Any>(
-            val kclass: KClass<T>,
+            val type: KClass<T>,
             val name: String,
-            val desc: String
+            val description: String
     ) : Provider<JsonFlag<T>> {
         @Inject
         lateinit var flagStore: DynamicFlagStore
@@ -140,8 +116,8 @@ abstract class DynamicFlagModule : KAbstractModule() {
         lateinit var moshi: Moshi
 
         override fun get(): JsonFlag<T> {
-            val stringFlag = flagStore.registerStringFlag(name, desc)
-            val adapter = moshi.adapter(kclass.java)
+            val stringFlag = flagStore.registerFlag<String>(name, description)
+            val adapter = moshi.adapter(type.java)
             return JsonFlag(stringFlag, adapter)
         }
     }
@@ -158,6 +134,18 @@ abstract class DynamicFlagModule : KAbstractModule() {
         override fun get(): T {
             val context = Flags.Context(prefix = prefix, flagStore = flagStore, moshi = moshi)
             return constructor.call(context)
+        }
+    }
+
+    companion object {
+        private inline fun <reified T : Any> flagTypeLiteral(): TypeLiteral<Flag<T>> =
+                flagTypeLiteral(T::class)
+
+        private fun <T : Any> flagTypeLiteral(kclass: KClass<T>): TypeLiteral<Flag<T>> {
+            val flagType = parameterizedType<Flag<T>>(kclass.java)
+
+            @Suppress("UNCHECKED_CAST")
+            return TypeLiteral.get(flagType) as TypeLiteral<Flag<T>>
         }
     }
 }
