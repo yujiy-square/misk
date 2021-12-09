@@ -3,7 +3,6 @@ package misk.web.jetty
 import com.google.common.base.Stopwatch
 import com.google.common.util.concurrent.AbstractIdleService
 import com.google.common.util.concurrent.ThreadFactoryBuilder
-import wisp.logging.getLogger
 import misk.security.ssl.CipherSuites
 import misk.security.ssl.SslLoader
 import misk.security.ssl.TlsProtocols
@@ -33,6 +32,8 @@ import org.eclipse.jetty.servlets.CrossOriginFilter
 import org.eclipse.jetty.unixsocket.server.UnixSocketConnector
 import org.eclipse.jetty.util.ssl.SslContextFactory
 import org.eclipse.jetty.util.thread.ThreadPool
+import org.eclipse.jetty.websocket.server.config.JettyWebSocketServletContainerInitializer
+import wisp.logging.getLogger
 import java.net.InetAddress
 import java.util.EnumSet
 import java.util.concurrent.SynchronousQueue
@@ -240,6 +241,25 @@ class JettyService @Inject internal constructor(
     // TODO(mmihic): Force security handler?
     val servletContextHandler = ServletContextHandler()
     servletContextHandler.addServlet(ServletHolder(webActionsServlet), "/*")
+//
+//    val inflaterPool = InflaterPool(333, false)
+//    val deflaterPool = DeflaterPool(333, Deflater.BEST_SPEED, false)
+//    servletContextHandler.setAttribute(
+//      WebSocketServerComponents.WEBSOCKET_DEFLATER_POOL_ATTRIBUTE,
+//      deflaterPool
+//    )
+//    servletContextHandler.setAttribute(
+//      WebSocketServerComponents.WEBSOCKET_INFLATER_POOL_ATTRIBUTE,
+//      inflaterPool
+//    )
+//
+
+//    servletContextHandler.addServletContainerInitializer(ServletContainerInitializerHolder({ c, ctx->
+//      WebSocketServerComponents.ensureWebSocketComponents(server, servletContext)
+//      JettyWebSocketServerContainer.ensureContainer(servletContext)
+//    }))
+
+    JettyWebSocketServletContainerInitializer.configure(servletContextHandler, null);
     server.addManaged(servletContextHandler)
 
     statisticsHandler.handler = servletContextHandler
@@ -248,6 +268,7 @@ class JettyService @Inject internal constructor(
     server.stopAtShutdown = true
     // Kubernetes sends a SIG_TERM and gives us 30 seconds to stop gracefully.
     server.stopTimeout = 25_000
+    // TODO: check this deprecated method.
     ServerConnectionStatistics.addToAllConnectors(server)
 
     gzipHandler.server = server
