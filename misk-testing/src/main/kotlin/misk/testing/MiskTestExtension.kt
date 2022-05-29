@@ -40,9 +40,12 @@ internal class MiskTestExtension : BeforeEachCallback, AfterEachCallback {
           multibind<BeforeEachCallback>().to<StartServicesBeforeEach>()
           multibind<AfterEachCallback>().to<StopServicesAfterEach>()
         }
+
         for (module in context.getActionTestModules()) {
           install(module)
         }
+        multibind<BeforeEachCallback>().to<MockAndBinder>()
+        multibind<AfterEachCallback>().to<MockAndBinder>()
         multibind<BeforeEachCallback>().to<InjectUninject>()
         multibind<BeforeEachCallback>().to<LogLevelExtension>()
         multibind<AfterEachCallback>().to<InjectUninject>()
@@ -54,8 +57,8 @@ internal class MiskTestExtension : BeforeEachCallback, AfterEachCallback {
     }
 
     val injector = Guice.createInjector(module)
+    injector.createChildInjector()
     context.store("injector", injector)
-
     injector.getInstance<Callbacks>().beforeEach(context)
   }
 
@@ -69,6 +72,18 @@ internal class MiskTestExtension : BeforeEachCallback, AfterEachCallback {
       dep.afterEach()
     }
   }
+
+  class MockAndBinder(): AfterEachCallback, BeforeEachCallback {
+    override fun afterEach(context: ExtensionContext?) {
+      TODO("Not yet implemented")
+    }
+
+    override fun beforeEach(context: ExtensionContext?) {
+      TODO("Not yet implemented")
+    }
+
+  }
+
 
   class StartServicesBeforeEach @Inject constructor() : BeforeEachCallback {
     @Inject
